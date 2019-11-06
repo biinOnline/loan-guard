@@ -1,4 +1,3 @@
-# Prepared by Community.lawyer on 11/4/2019
 # Compatible with Docassemble version 0.5.4
 ---
 modules:
@@ -14,27 +13,6 @@ code: |
 mandatory: True
 code: |
   define("Today", today())
----
-mandatory: True
-code: |
-  import json
-  ___subject_url = url_args.get("subject_url")
-  if (___subject_url):
-    if ("/api/v4/contacts/" in ___subject_url):
-      define("clio_contact_id", ___subject_url.replace("/api/v4/contacts/", ''))
-    elif ("/api/v4/matters/" in ___subject_url):
-      ___matter_id = ___subject_url.replace("/api/v4/matters/", '')
-      define("clio_matter_id", ___matter_id)
-
-      refresh_url = "https://app.clio.com/oauth/token"
-      refresh_data = {'client_id': get_config('clio client id'), 'client_secret': get_config('clio secret key'), 'grant_type': 'refresh_token', 'refresh_token': ''}
-      refresh_response = requests.post(url = refresh_url, data = refresh_data)
-      ___access_token = json.loads(refresh_response.content.decode()).get('access_token')
-      headers = {'Content-Type': 'application/json', 'Authorization': "Bearer %s" %(___access_token)}
-      ___matter_url = "https://app.clio.com/api/v4/matters/%s?fields=client{id,name}" %(___matter_id)
-      ___clio_matters_api_response = requests.get(___matter_url, headers=headers).json().get('data')
-      ___contact_id = ___clio_matters_api_response.get('client').get('id')
-      define("clio_contact_id", ___contact_id)
 ---
 mandatory: True
 code: |
@@ -328,63 +306,6 @@ code: |
         return self
       return augment(self.wrapped.get(arg.wrapped))
 
-    def clio_contacts_dictionary_access(self, contact_id):
-      import json
-      if is_undefined(self) or is_undefined(contact_id):
-        return Undefined()
-      ___refresh_url = "https://app.clio.com/oauth/token"
-      ___refresh_data = {'client_id': get_config('clio client id'), 'client_secret': get_config('clio secret key'), 'grant_type': 'refresh_token', 'refresh_token': ''}
-      ___refresh_response = requests.post(url = ___refresh_url, data = ___refresh_data)
-      ___clio_access_token = json.loads(___refresh_response.content.decode()).get('access_token')
-      ___headers = {'Content-Type': 'application/json', 'Authorization': "Bearer %s" %(___clio_access_token)}
-      ___member_response = requests.get("https://app.clio.com/api/v4/contacts/" + str(primitive_value(contact_id)) + "?" + primitive_value(self).get('url_parameters'), headers=___headers).json().get('data')
-
-      if not ___member_response:
-        raise(Exception("The contact id you chose (" + str(primitive_value(contact_id)) + ") for Clio Contacts table '" + primitive_value(self).get('variable_name') + "' didn't match any of your contacts."))
-
-      ___all_field_values = {}
-      ___fields = primitive_value(self).get('fields')
-      for field in ___fields:
-        ___all_field_values.update({ field.get('name'): clio_response_getter(___member_response, field.get('attribute_name'), field.get('sub_attribute_name'), field.get('selector'), field.get('mapped_to_custom_field')) })
-      return augment(___all_field_values)
-
-    def clio_matters_dictionary_access(self, matter_id):
-      import json
-      if is_undefined(self) or is_undefined(matter_id):
-        return Undefined()
-      ___refresh_url = "https://app.clio.com/oauth/token"
-      ___refresh_data = {'client_id': get_config('clio client id'), 'client_secret': get_config('clio secret key'), 'grant_type': 'refresh_token', 'refresh_token': ''}
-      ___refresh_response = requests.post(url = ___refresh_url, data = ___refresh_data)
-      ___clio_access_token = json.loads(___refresh_response.content.decode()).get('access_token')
-      ___headers = {'Content-Type': 'application/json', 'Authorization': "Bearer %s" %(___clio_access_token)}
-      ___member_response = requests.get("https://app.clio.com/api/v4/matters/" + str(primitive_value(matter_id)) + "?" + primitive_value(self).get('url_parameters'), headers=___headers).json().get('data')
-
-      if not ___member_response:
-        raise(Exception("The matter id you chose (" + str(primitive_value(matter_id)) + ") for Clio Matters table '" + primitive_value(self).get('variable_name') + "' didn't match any of your matters."))
-
-      ___all_field_values = {}
-      ___fields = primitive_value(self).get('fields')
-      for field in ___fields:
-        ___all_field_values.update({ field.get('name'): clio_response_getter(___member_response, field.get('attribute_name'), field.get('sub_attribute_name'), field.get('selector'), field.get('mapped_to_custom_field')) })
-      return augment(___all_field_values)
-
-    def google_tables_dictionary_access(self, key_column_value):
-      import json
-      if is_undefined(self) or is_undefined(key_column_value):
-        return Undefined()
-
-      if (not defined('___google_access_token')):
-        ___discovery_document = requests.get("https://accounts.google.com/.well-known/openid-configuration")
-        ___refresh_url = ___discovery_document.json().get('token_endpoint')
-        ___refresh_data = {'client_id': get_config('google client id'), 'client_secret': get_config('google secret key'), 'grant_type': 'refresh_token', 'refresh_token': ''}
-        ___refresh_response = requests.post(url = ___refresh_url, data = ___refresh_data)
-        ___google_access_token = ___refresh_response.json().get('access_token')
-
-      ___headers = {'Content-Type': 'application/json', 'Authorization': "Bearer %s" %(___google_access_token)}
-      ___sheets_response = requests.get(primitive_value(self).get('sheets_url'), headers=___headers).json().get('values')
-      ___key_column_index = ___sheets_response[0].index(primitive_value(self).get('key_column_name'))
-      ___selected_row_unflattened = list(filter(lambda row: row[___key_column_index] == str(primitive_value(key_column_value)), ___sheets_response[1:]))
-
       if len(___selected_row_unflattened) == 0:
         raise(Exception("The index you chose (" + str(primitive_value(key_column_value)) + ") for Google table '" + primitive_value(self).get('variable_name') + "' didn't match any values found in the table."))
 
@@ -402,30 +323,7 @@ code: |
       if is_undefined(self) or is_undefined(key_column_value):
         return Undefined()
 
-      if (not defined('___google_access_token')):
-        ___discovery_document = requests.get("https://accounts.google.com/.well-known/openid-configuration")
-        ___refresh_url = ___discovery_document.json().get('token_endpoint')
-        ___refresh_data = {'client_id': get_config('google client id'), 'client_secret': get_config('google secret key'), 'grant_type': 'refresh_token', 'refresh_token': ''}
-        ___refresh_response = requests.post(url = ___refresh_url, data = ___refresh_data)
-        ___google_access_token = ___refresh_response.json().get('access_token')
-
-      ___headers = {'Content-Type': 'application/json', 'Authorization': "Bearer %s" %(___google_access_token)}
-      ___sheets_response = requests.get(primitive_value(self).get('sheets_url'), headers=___headers).json().get('values')
-      ___key_column_index = ___sheets_response[0].index(primitive_value(self).get('key_column_name'))
-      ___selected_row = list(filter(lambda row: row[___key_column_index] == str(primitive_value(key_column_value)), ___sheets_response[1:]))
-
-      if len(___selected_row) == 0:
-        return False
-
-      return True
-
-    def google_row_index(self, _arg):
-      arg = augment(_arg)
-      if is_undefined(self) or is_undefined(arg):
-        return Undefined()
-      return augment(self.dictionary_access(arg))
-
-    # date math
+          # date math
     def days_after(self, _arg):
       arg = augment(_arg)
       if is_undefined(self) or is_undefined(arg):
